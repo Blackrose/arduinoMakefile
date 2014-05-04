@@ -22,23 +22,25 @@
 
 #Sketch, board and IDE path configuration (in general change only this section)
 # Sketch filename (should be in the same directory of Makefile)
-SKETCH_NAME=Blink.pde
+SKETCH_NAME=Blink
 # The port Arduino is connected
 #  Uno, in GNU/linux: generally /dev/ttyACM0
 #  Duemilanove, in GNU/linux: generally /dev/ttyUSB0
 PORT=/dev/ttyACM0
 # The path of Arduino IDE
-ARDUINO_DIR=/home/alvaro/arduino-0022
+ARDUINO_DIR=$(HOME)/arduino-1.0.5
 # Boardy type: use "arduino" for Uno or "stk500v1" for Duemilanove
-BOARD_TYPE=arduino
+BOARD_TYPE=wiring
 # Baud-rate: use "115200" for Uno or "19200" for Duemilanove
 BAUD_RATE=115200
 
 #Compiler and uploader configuration
 ARDUINO_CORE=$(ARDUINO_DIR)/hardware/arduino/cores/arduino
-INCLUDE=-I. -I$(ARDUINO_DIR)/hardware/arduino/cores/arduino
-TMP_DIR=/tmp/build_arduino
-MCU=atmega328p
+INCLUDE=-I. -I$(ARDUINO_DIR)/hardware/arduino/cores/arduino \
+		-I$(ARDUINO_DIR)/hardware/arduino/variants/mega
+
+TMP_DIR=./build_arduino
+MCU=atmega2560
 DF_CPU=16000000
 CC=/usr/bin/avr-gcc
 CPP=/usr/bin/avr-g++
@@ -47,13 +49,14 @@ AVRDUDE=/usr/bin/avrdude
 CC_FLAGS=-g -Os -w -Wall -ffunction-sections -fdata-sections -fno-exceptions \
 	 -std=gnu99
 CPP_FLAGS=-g -Os -w -Wall -ffunction-sections -fdata-sections -fno-exceptions
-AVRDUDE_CONF=/etc/avrdude.conf
-CORE_C_FILES=pins_arduino WInterrupts wiring_analog wiring wiring_digital \
+AVRDUDE_CONF=$(ARDUINO_DIR)/hardware/tools/avrdude.conf
+#CORE_C_FILES=pins_arduino WInterrupts wiring_analog wiring wiring_digital
+CORE_C_FILES=WInterrupts wiring_analog wiring wiring_digital \
 	     wiring_pulse wiring_shift
 CORE_CPP_FILES=HardwareSerial main Print Tone WMath WString
+SKETCH_SRC=$(wildcard *.cpp)
 
-
-all:		clean compile upload
+all: clean compile
 
 clean:
 		@echo '# *** Cleaning...'
@@ -64,8 +67,8 @@ compile:
 		@echo '# *** Compiling...'
 
 		mkdir $(TMP_DIR)
-		echo '#include "WProgram.h"' > "$(TMP_DIR)/$(SKETCH_NAME).cpp"
-		cat $(SKETCH_NAME) >> "$(TMP_DIR)/$(SKETCH_NAME).cpp"
+		#echo '#include "Arduino.h"' > "$(TMP_DIR)/$(SKETCH_NAME).c"
+		#cat $(SKETCH_NAME) >> "$(TMP_DIR)/$(SKETCH_NAME).c"
 
 		@#$(CPP) -MM -mmcu=$(MCU) -DF_CPU=$(DF_CPU) $(INCLUDE) \
 		#         $(CPP_FLAGS) "$(TMP_DIR)/$(SKETCH_NAME).cpp" \
@@ -73,10 +76,12 @@ compile:
 		#	 -MT "$(TMP_DIR)/$(SKETCH_NAME).o"
 
 		@#Compiling the sketch file:
-		$(CPP) -c -mmcu=$(MCU) -DF_CPU=$(DF_CPU) $(INCLUDE) \
-		       $(CPP_FLAGS) "$(TMP_DIR)/$(SKETCH_NAME).cpp" \
-		       -o "$(TMP_DIR)/$(SKETCH_NAME).o"
-		
+		for pro_c_file in $(SKETCH_SRC); do \
+		$(CPP) -mmcu=$(MCU) -DF_CPU=$(DF_CPU) $(INCLUDE) \
+		       $(CPP_FLAGS) -c $$pro_c_file \
+		       -o $(TMP_DIR)/$$pro_c_file.o; \
+		done
+
 		@#Compiling Arduino core .c dependecies:
 		for core_c_file in ${CORE_C_FILES}; do \
 		    $(CC) -c -mmcu=$(MCU) -DF_CPU=$(DF_CPU) $(INCLUDE) \
@@ -112,7 +117,7 @@ reset:
 
 upload:
 		@echo '# *** Uploading...'
-		$(AVRDUDE) -q -V -p $(MCU) -C $(AVRDUDE_CONF) -c $(BOARD_TYPE) \
+		$(AVRDUDE) -V -v -v -v -p $(MCU) -C $(AVRDUDE_CONF) -c $(BOARD_TYPE) \
 		           -b $(BAUD_RATE) -P $(PORT) \
-			   -U flash:w:$(TMP_DIR)/$(SKETCH_NAME).hex:i
+				   -D -U flash:w:$(TMP_DIR)/$(SKETCH_NAME).hex:i
 		@echo '# *** Done - enjoy your sketch!'
